@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+
+# dataset, taruh sendiri di audio/<kelas>/*.wav
+audio/
+
+# > 100 MB, dibuat ulang oleh Praproses_Data
+outputs/*.npy
