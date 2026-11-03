@@ -9,3 +9,4 @@ matplotlib
 joblib
 ipykernel
 torch==2.14.1
+streamlit

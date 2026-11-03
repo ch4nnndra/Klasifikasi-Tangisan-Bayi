@@ -5,5 +5,5 @@ __pycache__/
 # dataset, taruh sendiri di audio/<kelas>/*.wav
 audio/
 
-# > 100 MB, dibuat ulang oleh Praproses_Data
+# > 100 MB, dibuat ulang oleh Preprocessing_Data
 outputs/*.npy
