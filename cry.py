@@ -86,6 +86,7 @@ def load_model(path="outputs/model_final.pt"):
     ck = torch.load(path, map_location="cpu")  # selalu CPU, seperti di laptop pengguna
     model = CryNet(ck["bilstm"], ck["dropout"])
     model.load_state_dict(ck["state_dict"])
+    model.temperature = ck.get("temperature", 1.0)  # kalibrasi probabilitas (temperature scaling) dari Training_Model
     return model.eval(), ck["mean"], ck["std"]
 
 
@@ -108,7 +109,7 @@ def classify_features(model, mean, std, f):
     """Fitur (104, 188) -> 4 probabilitas yang jumlahnya 1."""
     x = (torch.from_numpy(f.astype(np.float32))[None] - mean) / std  # normalisasi dengan mean/std dari data train
     n = torch.tensor([sounding_steps(f)])
-    return torch.softmax(model(x, n), 1)[0].numpy()
+    return torch.softmax(model(x, n) / model.temperature, 1)[0].numpy()  # dibagi T supaya probabilitas tidak terlalu yakin
 
 
 def classify(model, mean, std, data):

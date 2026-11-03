@@ -70,6 +70,20 @@ f1_app = f1_score(d.y[te], pred, average="macro")
 print(f"F1-Macro test: aplikasi {f1_app:.4f} | notebook {f1_notebook:.4f}")
 assert abs(f1_app - f1_notebook) < 0.02
 
+# kalibrasi: temperature tidak mengubah kelas yang ditebak, dan NLL di data test membaik
+def probabilitas(T):
+    model.temperature = T
+    return np.array([cry.classify_features(model, mean, std, X[i]) for i in te])
+
+
+T = float(torch.load("outputs/model_final.pt", map_location="cpu").get("temperature", 1.0))
+p_T, p_1 = probabilitas(T), probabilitas(1.0)
+model.temperature = T
+assert (p_T.argmax(1) == p_1.argmax(1)).all()
+nll = lambda p: -np.log(np.clip(p[np.arange(len(te)), d.y[te].values], 1e-12, 1)).mean()
+print(f"Temperature T = {T:.2f} | NLL test {nll(p_1):.3f} -> {nll(p_T):.3f} | confidence rata-rata {p_1.max(1).mean():.3f} -> {p_T.max(1).mean():.3f}")
+assert nll(p_T) <= nll(p_1)
+
 # KNF-01: waktu respons (nilai tengah 20 kali) di CPU untuk klip 6 detik
 data = Path(contoh.path.iloc[0]).read_bytes()
 cry.classify(model, mean, std, data)  # warm-up
