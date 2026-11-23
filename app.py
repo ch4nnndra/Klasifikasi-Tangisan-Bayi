@@ -1,4 +1,4 @@
-"""Aplikasi web Pendeteksi Kebutuhan Bayi. Jalankan: streamlit run app.py"""
+# Aplikasi web Pendeteksi Kebutuhan Bayi. Jalankan: streamlit run app.py
 import hashlib
 import io
 from pathlib import Path
@@ -12,9 +12,9 @@ import cry
 st.set_page_config(page_title="Pendeteksi Kebutuhan Bayi", layout="wide")
 
 
+# muat model sekali saat aplikasi mulai (None kalau file model tidak ada), lalu warm-up
 @st.cache_resource
 def get_model():
-    """Model dimuat sekali saat aplikasi mulai. None kalau file model tidak ada."""
     if not Path("outputs/model_final.pt").exists():
         return None
     m = cry.load_model()

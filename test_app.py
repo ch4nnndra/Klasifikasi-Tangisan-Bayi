@@ -1,4 +1,4 @@
-"""Tes mandiri untuk cry.py. Jalankan: python test_app.py (butuh folder audio/ dan hasil notebook di outputs/)."""
+# Tes untuk cry.py. Jalankan: python test_app.py (butuh folder audio/ dan hasil notebook di outputs/)
 import io
 import statistics
 import time
@@ -18,6 +18,7 @@ model, mean, std = cry.load_model()
 f1_notebook = torch.load("outputs/model_final.pt", map_location="cpu")["f1_test"]
 
 
+# audio noise buatan sepanjang `detik`, dalam bentuk bytes
 def wav(detik, ext="WAV"):
     buf = io.BytesIO()
     sf.write(buf, 0.1 * np.random.default_rng(0).standard_normal(int(cry.SR * detik)), cry.SR, format=ext)
@@ -71,6 +72,7 @@ print(f"F1-Macro test: aplikasi {f1_app:.4f} | notebook {f1_notebook:.4f}")
 assert abs(f1_app - f1_notebook) < 0.02
 
 # kalibrasi: temperature tidak mengubah kelas yang ditebak, dan NLL di data test membaik
+# probabilitas semua klip test dengan temperature T
 def probabilitas(T):
     model.temperature = T
     return np.array([cry.classify_features(model, mean, std, X[i]) for i in te])
@@ -97,6 +99,7 @@ assert statistics.median(waktu) <= 5
 
 
 # KNF-04: tidak ada file baru di folder aplikasi setelah analisis
+# daftar file proyek beserta ukurannya
 def snapshot():
     return {str(p): p.stat().st_size for p in Path(".").rglob("*")
             if p.is_file() and not {".venv", ".git", "__pycache__", "audio"} & set(p.parts)}

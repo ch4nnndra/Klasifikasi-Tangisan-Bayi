@@ -1,6 +1,4 @@
-"""Preprocessing, feature extraction, dan model untuk aplikasi.
-Kodenya disalin dari notebook (Preprocessing_Data dan Training_Model) supaya fitur dari aplikasi sama dengan saat training (KF-04).
-"""
+# Preprocessing, fitur, dan model untuk aplikasi. Disalin dari notebook supaya fitur sama dengan saat training (KF-04).
 import io
 
 import librosa
@@ -22,48 +20,53 @@ HPF = scipy.signal.butter(4, 50, btype="highpass", fs=SR, output="sos")
 
 
 # --- preprocessing dan fitur (sama dengan Preprocessing_Data) ---
+# baca audio dari memori (tanpa simpan file) jadi mono 16 kHz
 def load_audio(data):
-    y, _ = librosa.load(io.BytesIO(data), sr=SR, mono=True)  # dibaca dari memori, tidak ada file yang disimpan
+    y, _ = librosa.load(io.BytesIO(data), sr=SR, mono=True)
     return y.astype(np.float32)
 
 
+# high-pass 50 Hz, peak normalization, lalu potong tengah / zero padding sampai 6 detik
 def preprocess(y):
-    y = scipy.signal.sosfilt(HPF, y)  # buang noise frekuensi rendah (< 50 Hz)
+    y = scipy.signal.sosfilt(HPF, y)
     peak = np.max(np.abs(y)) if len(y) else 0.0
     if peak > 0:
         y = y / peak
     if len(y) > N_SAMPLES:
-        s = (len(y) - N_SAMPLES) // 2  # potong di tengah
+        s = (len(y) - N_SAMPLES) // 2
         y = y[s:s + N_SAMPLES]
     else:
-        y = np.pad(y, (0, N_SAMPLES - len(y)))  # zero padding di akhir
+        y = np.pad(y, (0, N_SAMPLES - len(y)))
     return y.astype(np.float32)
 
 
+# Mel-Spectrogram 64 band (0-3,5 kHz) dalam dB
 def mel_db(y):
     return librosa.power_to_db(librosa.feature.melspectrogram(
         y=y, sr=SR, n_fft=N_FFT, hop_length=HOP, n_mels=N_MELS, fmax=FMAX, center=True), ref=1.0)
 
 
+# sinyal -> matriks (104, 188) float16: 64 baris Mel + 40 baris MFCC, sama seperti X.npy
 def features(y):
-    """Sinyal 16 kHz mono -> matriks (104, 188) float16: 64 baris Mel + 40 baris MFCC."""
     M = mel_db(preprocess(y))
-    return np.vstack([M, librosa.feature.mfcc(S=M, n_mfcc=N_MFCC)]).astype(np.float16)  # float16 seperti di X.npy
+    return np.vstack([M, librosa.feature.mfcc(S=M, n_mfcc=N_MFCC)]).astype(np.float16)
 
 
+# jumlah langkah waktu (dari 47) yang berbunyi; frame zero padding punya nilai Mel minimum
 def sounding_steps(f):
-    """Jumlah langkah waktu (dari 47) yang berbunyi. Frame zero padding punya nilai Mel minimum di semua baris."""
     mel = f[:N_MELS].astype(np.float32)
-    ada = np.flatnonzero(mel.max(0) > mel.min() + 0.01)  # frame yang tidak kosong
+    ada = np.flatnonzero(mel.max(0) > mel.min() + 0.01)
     frame_akhir = ada[-1] + 1 if len(ada) else 0
     return max((frame_akhir + 3) // 4, 1)
 
 
 # --- model (sama dengan Training_Model) ---
+# satu blok CNN: Conv 3x3 -> BatchNorm -> ReLU -> MaxPool
 def conv_block(c_in, c_out, pool):
     return nn.Sequential(nn.Conv2d(c_in, c_out, kernel_size=3, padding=1), nn.BatchNorm2d(c_out), nn.ReLU(), nn.MaxPool2d(pool))
 
 
+# 3 blok CNN -> (BiLSTM untuk Model B) -> rata-rata waktu tanpa padding -> 4 logit
 class CryNet(nn.Module):
     def __init__(self, bilstm=False, dropout=0.3):
         super().__init__()
@@ -82,17 +85,18 @@ class CryNet(nn.Module):
         return self.head((x * ada).sum(1) / n[:, None])
 
 
+# muat model final di CPU beserta mean/std normalisasi dan temperature
 def load_model(path="outputs/model_final.pt"):
-    ck = torch.load(path, map_location="cpu")  # selalu CPU, seperti di laptop pengguna
+    ck = torch.load(path, map_location="cpu")
     model = CryNet(ck["bilstm"], ck["dropout"])
     model.load_state_dict(ck["state_dict"])
-    model.temperature = ck.get("temperature", 1.0)  # kalibrasi probabilitas (temperature scaling) dari Training_Model
+    model.temperature = ck.get("temperature", 1.0)
     return model.eval(), ck["mean"], ck["std"]
 
 
 # --- dipakai aplikasi ---
+# pesan error kalau audio ditolak (KF-03), None kalau valid
 def check(name, data):
-    """Pesan error kalau audio ditolak (KF-03), None kalau valid."""
     if not name.lower().endswith((".wav", ".mp3")):
         return "Format berkas tidak didukung. Gunakan WAV atau MP3."
     try:
@@ -104,20 +108,21 @@ def check(name, data):
     return None
 
 
+# fitur (104, 188) -> 4 probabilitas; logit dibagi T supaya tidak terlalu yakin
 @torch.no_grad()
 def classify_features(model, mean, std, f):
-    """Fitur (104, 188) -> 4 probabilitas yang jumlahnya 1."""
-    x = (torch.from_numpy(f.astype(np.float32))[None] - mean) / std  # normalisasi dengan mean/std dari data train
+    x = (torch.from_numpy(f.astype(np.float32))[None] - mean) / std
     n = torch.tensor([sounding_steps(f)])
-    return torch.softmax(model(x, n) / model.temperature, 1)[0].numpy()  # dibagi T supaya probabilitas tidak terlalu yakin
+    return torch.softmax(model(x, n) / model.temperature, 1)[0].numpy()
 
 
+# bytes audio -> 4 probabilitas
 def classify(model, mean, std, data):
     return classify_features(model, mean, std, features(load_audio(data)))
 
 
+# persentase bulat yang jumlahnya tepat 100 (sisa pembulatan ke desimal terbesar)
 def persen(p):
-    """Persentase bulat yang jumlahnya tepat 100 (sisa pembulatan diberikan ke angka desimal terbesar)."""
     raw = np.asarray(p) * 100
     bulat = np.floor(raw).astype(int)
     for i in np.argsort(-(raw - bulat))[:100 - bulat.sum()]:
