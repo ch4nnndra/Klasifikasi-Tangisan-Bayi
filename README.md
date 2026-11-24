@@ -13,8 +13,8 @@ streamlit run app.py
 Dataset [Infant Cry Classification (4 Classes)](https://www.kaggle.com/datasets/karimeletriby/infant-cry-classification-4-classes) tidak ikut di repo. Taruh di `audio/<kelas>/*.wav`, lalu jalankan notebook berurutan:
 
 1. `Audit_Data.ipynb`: cek kualitas data, buang duplikat dan klip yang labelnya bertentangan.
-2. `Preprocessing_Data.ipynb`: split per grup rekaman, fitur Mel-Spectrogram + MFCC, augmentation.
-3. `Training_Model.ipynb`: ablation Model A (CNN) vs Model B (CNN + BiLSTM), lalu simpan model final.
+2. `Preprocessing_Data.ipynb`: split per grup rekaman, fitur Mel-Spectrogram + MFCC, conditional augmentation untuk kelas minoritas.
+3. `Training_Model.ipynb`: perbandingan fitur, Model A (CNN) vs Model B (CNN + BiLSTM) dengan 3 seed, tuning hyperparameter, kalibrasi, lalu simpan model final.
 
 ## Tes
 ```bash
